@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated images, captures and descriptions
+output/
+
+# Personal project files (contain local mod/icon paths) - see README for the format
+projects/*.json
+
+# Build artifacts (PyInstaller)
+build/
+dist/
+*.spec
+
+# OS / editor clutter
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
