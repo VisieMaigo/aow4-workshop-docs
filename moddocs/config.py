@@ -61,7 +61,7 @@ def load(name):
     path = PROJECTS / f"{name}.json"
     if not path.exists():
         known = ", ".join(p.stem for p in PROJECTS.glob("*.json")) or "none yet"
-        raise SystemExit(f"No project '{name}' (known: {known}). Create one with: tomedocs.py init <mod folder>")
+        raise SystemExit(f"No project '{name}' (known: {known}). Create one with: moddocs.py init <mod folder>")
     cfg = json.loads(path.read_text())
     cfg["name"] = name
     cfg["tomes"] = [{**TOME_DEFAULTS, **t} for t in cfg["tomes"]]

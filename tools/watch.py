@@ -23,8 +23,8 @@ import win32gui
 from pynput import keyboard, mouse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from tomedocs.config import OUTPUT  # noqa: E402
-from tomedocs.game import Game  # noqa: E402
+from moddocs.config import OUTPUT  # noqa: E402
+from moddocs.game import Game  # noqa: E402
 
 
 def main():

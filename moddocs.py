@@ -1,12 +1,12 @@
-"""AoW4 Tome Docs - Steam Workshop images and descriptions for Age of Wonders 4 tome mods.
+"""AoW4 Workshop Docs - Steam Workshop images and descriptions for Age of Wonders 4 mods.
 
-  python tomedocs.py init "<mod folder>"         create a project from the mod's .po files
-  python tomedocs.py check                       check the game window / screen setup (no input sent)
-  python tomedocs.py preview <project>           list what would be captured (opens the pages, hovers nothing)
-  python tomedocs.py capture <project> [--only "Skill A,Skill B"]
-  python tomedocs.py compose <project>
-  python tomedocs.py describe <project>
-  python tomedocs.py run <project>               capture + compose + describe
+  python moddocs.py init "<mod folder>"         create a project from the mod's .po files
+  python moddocs.py check                       check the game window / screen setup (no input sent)
+  python moddocs.py preview <project>           list what would be captured (opens the pages, hovers nothing)
+  python moddocs.py capture <project> [--only "Skill A,Skill B"]
+  python moddocs.py compose <project>
+  python moddocs.py describe <project>
+  python moddocs.py run <project>               capture + compose + describe
 
 All of them take --tome T / --unit U (partial names, repeatable) to limit the
 run; naming only tomes leaves units out and vice versa.
@@ -17,7 +17,7 @@ touch the mouse/keyboard until it's done (about 30 s per tome or unit).
 import argparse
 import sys
 
-from tomedocs import config
+from moddocs import config
 
 
 def cmd_init(args):
@@ -26,12 +26,12 @@ def cmd_init(args):
     print(f"Tomes found: {', '.join(tomes) or 'none - add them by hand'}")
     print(f"Units found: {', '.join(units) or 'none - add them by hand'}")
     print("Optional: edit it to set icon_folder and subtooltips per tome, and form (racial units) per unit.")
-    print(f"Next: start the game, go to the main menu, then run:  python tomedocs.py run {path.stem}")
+    print(f"Next: start the game, go to the main menu, then run:  python moddocs.py run {path.stem}")
 
 
 def cmd_check(args):
-    from tomedocs.game import Game
-    from tomedocs.locate import find_template
+    from moddocs.game import Game
+    from moddocs.locate import find_template
     game = Game()
     w, h = game.size
     device, mon = game.monitor()
@@ -72,10 +72,10 @@ def main():
     cfg = config.load(args.project)
     tomes, units = config.pick(cfg, args.tome, args.unit)
     if args.cmd == "preview":
-        from tomedocs.capture import capture
+        from moddocs.capture import capture
         return capture(cfg, tomes, units, preview=True)
     if args.cmd in ("capture", "run"):
-        from tomedocs.capture import capture
+        from moddocs.capture import capture
         capture(cfg, tomes, units, [s.strip() for s in args.only.split(",")] if args.only else None)
 
     def done(item, folder):
@@ -86,7 +86,7 @@ def main():
             if not done(x, folder):
                 print(f"[{x['name']}] not captured yet - skipped (run: capture {cfg['name']} --{kind} \"{x['name']}\")")
     if args.cmd in ("compose", "run"):
-        from tomedocs.compose import compose, compose_unit
+        from moddocs.compose import compose, compose_unit
         for t in tomes:
             if done(t, config.tome_dir):
                 print(f"[{t['name']}]")
@@ -100,7 +100,7 @@ def main():
         all_tomes = [t for t in cfg["tomes"] if done(t, config.tome_dir)]
         all_units = [u for u in cfg["units"] if done(u, config.unit_dir)]
         if all_tomes or all_units:
-            from tomedocs.describe import describe
+            from moddocs.describe import describe
             describe(cfg, all_tomes, all_units)
 
 

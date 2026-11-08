@@ -1,13 +1,14 @@
-# Agent guide: AoW4 Tome Docs
+# Agent guide: AoW4 Workshop Docs
 
 You're helping an Age of Wonders 4 mod author make Steam Workshop images and a
-description for their tome mod - its tomes and its tome units. Windows only.
+description for their mod - its tomes and its units (either or both). Windows
+only.
 
 ## Ground rules
 
 - **Capturing moves the user's mouse.** Never run `preview`, `capture` or `run`
   until the user has the game on the main menu and has said go. Tell them how
-  long it takes (~10 s for preview, ~30 s per tome for capture). `check`,
+  long it takes (~10 s for preview, ~30 s per tome or unit for capture). `check`,
   `compose`, `describe` and `init` don't touch input and are always safe.
 - Look at the results (open the PNGs, read the description) before reporting
   back, and show the user what was produced.
@@ -15,21 +16,22 @@ description for their tome mod - its tomes and its tome units. Windows only.
 ## Workflow
 
 1. Setup (once): `pip install -r requirements.txt`
-2. Create a project from the mod folder (reads `Language/EN/*.po` to find tomes):
-   `python tomedocs.py init "<mod folder>"` -> `projects/<name>.json`
+2. Create a project from the mod folder (reads `Language/EN/*.po` to find tomes
+   and units):
+   `python moddocs.py init "<mod folder>"` -> `projects/<name>.json`
 3. Ask for / fill in the settings in that JSON (see below): per tome especially
    `icon_folder`; per unit, for racial units, which `form` to show (Human by
    default - authors often prefer a non-human form). `init` lists the tomes and
    units it found in the .po files; check the lists with the user.
-4. User starts the game, goes to the main menu. Run `python tomedocs.py check`
+4. User starts the game, goes to the main menu. Run `python moddocs.py check`
    (passive: finds the window, warns if screenshots are black = fullscreen).
-5. `python tomedocs.py preview <name>` lists what each page offers to capture
+5. `python moddocs.py preview <name>` lists what each page offers to capture
    (~10 s per page). For **units, always ask which abilities to show**: preview
    lists every ability on the unit's card, marked attack / mod, with the
    default pick (attacks + the mod's own abilities). 3-5 per unit read best.
    Put the user's choice, in display order, in the unit's `abilities`. Also
    ask about `subtooltips` worth adding.
-6. `python tomedocs.py run <name>` = capture + compose + describe.
+6. `python moddocs.py run <name>` = capture + compose + describe.
    Re-capture a few skills only: `capture <name> --tome X --only "Skill A,Skill B"`.
    Rebuild without the game: `compose <name>`, `describe <name>`.
 7. **Write the description yourself** from
@@ -137,18 +139,18 @@ Examples:
 
 ## How it works (for debugging)
 
-- `tomedocs/capture.py` – navigation: main-menu "i" button -> Tomes tab ->
+- `moddocs/capture.py` – navigation: main-menu "i" button -> Tomes tab ->
   search box -> result -> page. Button images in `templates/`; the UI scale is
   measured from them. Each run saves `page.png` and `manifest.json` per tome.
-- `tomedocs/locate.py` – finds skills on the page: OCR'd labels that match a
+- `moddocs/locate.py` – finds skills on the page: OCR'd labels that match a
   name from the mod's .po files (stale .po entries never appear on the page, so
   they're ignored); icon = circle above the label, else it's a text link.
-- `tomedocs/tooltips.py` – tooltip = difference between frames with and
+- `moddocs/tooltips.py` – tooltip = difference between frames with and
   without hover, snapped to the tooltip's border line; sub-tooltips are cut to
   the bordered box around their title.
-- `tomedocs/background.py` – removes the encyclopedia UI: mirrored opposite
+- `moddocs/background.py` – removes the encyclopedia UI: mirrored opposite
   side, Poisson-blended; plain background for the Tooltips image.
-- `tomedocs/describe.py` – OCR of tooltips (several zooms, best reading per
+- `moddocs/describe.py` – OCR of tooltips (several zooms, best reading per
   line) + .po text -> `description_facts.md`.
 - Units: the Tome Units tab, then the same search. Racial units have a Forms
   button (`templates/forms_button.png`) opening a scrollable list.

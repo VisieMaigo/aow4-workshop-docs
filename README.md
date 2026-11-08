@@ -1,20 +1,22 @@
-# AoW4 Tome Docs
+# AoW4 Workshop Docs
 
-Steam Workshop images and descriptions for **Age of Wonders 4 tome mods**,
-captured straight from the game's encyclopedia:
+Steam Workshop images and descriptions for **Age of Wonders 4 mods** - tomes,
+units, or both - captured straight from the game's encyclopedia:
 
 - **`<Tome> - Overview.png`** – the tome page as shown in game, side panel blended away
 - **`<Tome> - Tooltips.png`** – every skill tooltip with your icon art beside it
   (units are left out – they get their own)
-- **`<Unit>.png`** – each tome unit's page (racial units in the form you pick)
+- **`<Unit>.png`** – each unit's page (racial units in the form you pick)
   with its key ability tooltips alongside
 - **`<Mod> - Description.txt`** – a short BBCode description for the Workshop
-  page covering all the mod's tomes, written by the agent from the captured
-  tooltips and your .po files
+  page covering all the mod's tomes and units, written by the agent from the
+  captured tooltips and your .po files
+
+A mod that only adds units works too: its project just has no tomes.
 
 Python drives the game and does the capturing, cropping and compositing: it
-opens the encyclopedia from the main menu, searches each tome, reads the page
-to find the skills and hovers each one. An LLM agent turns your requests into
+opens the encyclopedia from the main menu, searches each tome or unit, reads
+the page to find the skills and hovers each one. An LLM agent turns your requests into
 settings, runs the tool, reviews the resulting images and fixes what looks
 off, and writes the Workshop description.
 
@@ -40,7 +42,7 @@ The agent follows [AGENTS.md](AGENTS.md). You only need to:
 2. Start the game (**Display Mode: Borderless or Windowed**, English, mod
    enabled) and stay on the **main menu**.
 3. When the agent asks, **let go of the mouse** for ~30 seconds per tome
-   while it captures.
+   or unit while it captures.
 
 Prefer doing it by hand? See the commands in [AGENTS.md](AGENTS.md).
 
