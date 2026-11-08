@@ -172,3 +172,12 @@ def terms(strings):
             if name and len(name) > 3:
                 out.add(name)
     return out
+
+
+def find_units(strings):
+    """Likely unit names: strings under a ...UNIT@NAME / UNIT_NAME key."""
+    names = []
+    for k, v in strings.items():
+        if re.search(r"(^|[@_])UNIT[@_]NAME$", k) and "{" not in v and v not in names:
+            names.append(v)
+    return names

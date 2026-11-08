@@ -1,8 +1,9 @@
-"""Write Steam Workshop descriptions (BBCode) from the captured tooltips.
+"""Collect the facts for the Steam Workshop description.
 
 Tooltip text is read with OCR (it has the real numbers players see); the .po
 files add the tome's description and its Ascension skill, which the
-encyclopedia doesn't show. Output is a draft to review, not final copy.
+encyclopedia doesn't show. Everything goes into one facts file, from which the
+agent writes the short final description (style guide: AGENTS.md).
 """
 import difflib
 import json
@@ -12,7 +13,7 @@ from pathlib import Path
 from PIL import Image
 
 from . import po
-from .config import file_name, final_dir, tome_dir
+from .config import file_name, final_dir, tome_dir, unit_dir
 from .locate import match_name, norm
 from .ocr import read_lines
 
@@ -113,15 +114,18 @@ def read_best(img, vocab, scales=(2, 1.5, 3)):
     return sorted(best, key=lambda r: (r[2][1], r[2][0]))
 
 
-def read_tooltip(img, names, tome_name, vocab=()):
-    """Structured content of one tooltip image."""
+def read_tooltip(img, names, tome_name, vocab=(), typed=True):
+    """Structured content of one tooltip image. typed=False for unit abilities,
+    whose second line is accuracy/range numbers rather than a type."""
     ocr = read_best(img, vocab)
     if not ocr:
         return None
     title = match_name(ocr[0][0], names) or po.title_case(ocr[0][0].split())
+    if not typed:
+        ocr = [ocr[0]] + [o for o in ocr[1:] if re.search(r"[A-Za-z]{3}", o[0])]
     # Line 2 is normally the type ("Skill level IV - Unit Enchantment - ..."), but
     # sub-tooltips (traits, statuses) go straight into their text.
-    has_type = len(ocr) > 1 and not re.search(r"[:.]$", ocr[1][0])
+    has_type = typed and len(ocr) > 1 and not re.search(r"[:.]$", ocr[1][0])
     kind = tooltip_type(ocr[1][1]) if has_type else ""
 
     body, eligible, section, prev_x = [], [], None, None
@@ -150,72 +154,6 @@ def read_tooltip(img, names, tome_name, vocab=()):
             body.append(line)
         prev_x = box[0]
     return {"name": title, "type": kind, "body": body, "eligible": eligible}
-
-
-def _lower_first(item):
-    """'Deal +2 Frost Damage' -> 'deal +2 ...' (but keep names like 'Frigid Presence, ...')."""
-    words = item.split()
-    if len(words) > 1 and words[0][0].isupper() and not words[1][0].isupper():
-        return words[0][0].lower() + item[1:]
-    return item
-
-
-def effects(d):
-    """Body lines -> sentences, folding 'Header:' lines into the items after them."""
-    out, header, items = [], None, []
-
-    def flush():
-        if header and items:
-            out.append(f"{header} " + "; ".join(_lower_first(i.rstrip(".")) for i in items) + ".")
-        elif header:
-            out.append(header)
-        else:
-            out.extend(items)
-
-    for line in d["body"]:
-        if line.endswith(":"):
-            flush()
-            header, items = line, []
-        else:
-            items.append(line)
-    flush()
-    return out
-
-
-def unit_summary(d):
-    """'A Shield Unit that wears down enemies...' -> ('Shield Unit', 'Wears down enemies...')."""
-    first = d["body"][0] if d["body"] else ""
-    m = re.match(r"^An?\s+(.+?\bUnit)\s+(?:that|which|who)\s+(.*?)\.?$", first)
-    if m:
-        return m.group(1), m.group(2)[0].upper() + m.group(2)[1:] + "."
-    return None, first
-
-
-def entry_lines(d, subs):
-    """(headline, [detail lines]) for one skill."""
-    if d["type"].lower() == "unit":
-        cls, summary = unit_summary(d)
-        return f"[b]{d['name']}[/b] — Unit{f' ({cls})' if cls else ''}", [summary]
-    details = []
-    if d["eligible"]:
-        details.append("Eligible: " + ", ".join(d["eligible"]) + " units")
-    details += effects(d)
-    for s in subs:
-        details.append(f"{s['name']}: " + " ".join(effects(s)))
-    return f"[b]{d['name']}[/b] — {d['type']}", details
-
-
-def ascension_line(strings, tome_name):
-    asc = po.ascension(strings, tome_name)
-    if not asc:
-        return None
-    trait, grants = asc
-    parts = []
-    for kind, name, desc in grants:
-        text = re.sub(r"^Grants:\s*", "", desc).replace("\n• ", "; ").replace("• ", "").replace("\n", " ")
-        text = text.replace(":;", ":").rstrip(".")
-        parts.append(f"{name} ({text})" if name and text else name or text)
-    return f"[b]{trait}[/b] — Ascension Skill", ["Grants " + "; ".join(parts) + "."] if parts else []
 
 
 def tome_header(strings, tome, manifest, folder, vocab):
@@ -255,8 +193,10 @@ def initial_bonus(page_file, page_lines, s, vocab):
                 found.append(text)
     return found
 
+ROMAN_VALUE = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6}
 
-def describe_tome(cfg, tome, strings, names, vocab):
+
+def tome_facts(cfg, tome, strings, names, vocab):
     folder = tome_dir(cfg, tome)
     manifest = json.loads((folder / "manifest.json").read_text())
     parsed = {}
@@ -264,76 +204,91 @@ def describe_tome(cfg, tome, strings, names, vocab):
         d = read_tooltip(Image.open(folder / e["file"]), names, tome["name"], vocab)
         if d:
             parsed[e["name"]] = (e, d)
-    # Scroll skills in reading order, then Initial Bonus links, then Ascension.
+    # Scroll skills in reading order, then Initial Bonus links.
     order = sorted((e for e, _ in parsed.values() if e["kind"] != "sub"),
                    key=lambda e: (e["kind"] != "icon", e["anchor"][1] // 60, e["anchor"][0]))
-    entries, candidates = [], {}
     configured = {(s["parent"], s["link"]) for s in tome["subtooltips"]}
+    skills, candidates = [], {}
     for e in order:
         d = parsed[e["name"]][1]
         subs = [x_d for (x, x_d) in parsed.values() if x.get("parent") == e["name"]]
-        entries.append(entry_lines(d, subs))
+        skills.append({**d, "where": "Initial Bonus" if e["kind"] == "link" else "tome skill", "subs": subs})
         # Mod-defined names mentioned in the tooltip text are likely links with
         # nested tooltips of their own (traits, statuses, effects).
         text = norm(" ".join(d["body"]))
         found = [n for n in names if len(norm(n)) > 4 and norm(n) in text and (e["name"], n) not in configured]
         if found:
             candidates[e["name"]] = sorted(found)
-    asc = ascension_line(strings, tome["name"])
-    if asc:
-        entries.append(asc)
     tier, gameplay, bonus = tome_header(strings, tome, manifest, folder, vocab)
-    return {"name": tome["name"], "tier": tier, "gameplay": gameplay, "bonus": bonus, "entries": entries,
-            "candidates": candidates}
+    return {"name": tome["name"], "tier": tier, "gameplay": gameplay, "bonus": bonus, "skills": skills,
+            "ascension": po.ascension(strings, tome["name"]), "candidates": candidates}
 
 
-def bbcode(tomes, style):
-    out = []
-    for t in tomes:
-        tier = f" (Tier {t['tier']})" if t["tier"] else ""
-        out.append(f"[h2]{t['name']}{tier}[/h2]")
-        if t["gameplay"]:
-            out.append(f"[i]{t['gameplay']}[/i]")
-        if t["bonus"]:
-            out.append(f"[b]Initial bonus:[/b] {', '.join(t['bonus'])}")
-        out.append("[list]")
-        for head, details in t["entries"]:
-            if style == "compact":
-                # [Name] — [Type]: [Effect] (Eligible: ...)
-                eligible = [d for d in details if d.startswith("Eligible:")]
-                rest = [d if re.search(r"[.!?]$", d) else d + "." for d in details if d not in eligible]
-                tail = f" ({eligible[0]})" if eligible else ""
-                out.append(f"[*]{head}: {' '.join(rest)}{tail}")
-            else:
-                out.append(f"[*]{head}")
-                if details:
-                    out.append("[list]" + "".join(f"[*]{d}" for d in details) + "[/list]")
-        out.append("[/list]")
+def unit_facts(cfg, unit, names, vocab):
+    folder = unit_dir(cfg, unit)
+    manifest = json.loads((folder / "manifest.json").read_text())
+    card = [t for t, b in manifest["page_lines"] if b[0] > 0.74 * manifest["size"][0]]
+    role = next((t for t in card if re.search(r"\bUnit\b", t) and norm(t) != norm(unit["name"])), "")
+    tier = next((m.group(1).replace("1", "I") for t in card if (m := re.search(r"\bTier\s+([IVX1]+)", t))), None)
+    abilities = []
+    for e in manifest["tooltips"]:
+        d = read_tooltip(Image.open(folder / e["file"]), names, unit["name"], vocab, typed=False)
+        if d:
+            abilities.append({**d, "sub": e["kind"] == "sub"})
+    return {"name": unit["name"], "form": manifest.get("form"), "role": clean_line(role), "tier": tier,
+            "listed": manifest.get("abilities", []), "abilities": abilities}
+
+
+def facts_markdown(mod, data, units=()):
+    out = [f"# Description facts: {mod}", "",
+           f"Raw material for `{mod} - Description.txt`. Write that file following the",
+           "style guide in AGENTS.md. Tooltip text is OCR - check names against the .po files.", ""]
+    for t in data:
+        out.append(f"## {t['name']}" + (f" (Tier {t['tier']})" if t["tier"] else ""))
+        out.append(f"- Gameplay description (.po): {t['gameplay'] or '-'}")
+        out.append(f"- Initial bonus (page): {', '.join(t['bonus']) or '-'}")
+        for s in t["skills"]:
+            out += ["", f"### {s['name']} - {s['type'] or '?'} ({s['where']})"]
+            if s["eligible"]:
+                out.append(f"Eligible units: {', '.join(s['eligible'])}")
+            out += [f"    {line}" for line in s["body"]]
+            for sub in s["subs"]:
+                out.append(f"Nested tooltip '{sub['name']}':")
+                out += [f"    {line}" for line in sub["body"]]
+        if t["ascension"]:
+            trait, grants = t["ascension"]
+            out += ["", f"### {trait} - Ascension Skill (.po only, not shown in game; X = value computed by the game)"]
+            for kind, name, desc in grants:
+                out.append(f"{kind}: {name or '(unnamed)'}")
+                out += [f"    {line}" for line in desc.splitlines()]
         out.append("")
-    return "\n".join(out).strip() + "\n"
+    for u in units:
+        out.append(f"## Unit: {u['name']}" + (f" (Tier {u['tier']})" if u["tier"] else ""))
+        out.append(f"- Role (unit card): {u['role'] or '-'}" + (f"; shown in {u['form']} form" if u["form"] else ""))
+        listed = [a["name"] + (" (attack)" if a["attack"] else "") + (" (mod)" if a["mod"] else "") for a in u["listed"]]
+        out.append(f"- All abilities on the card: {', '.join(listed) or '-'}")
+        for a in u["abilities"]:
+            out += ["", f"### {'Nested tooltip ' if a['sub'] else ''}{a['name']}"]
+            out += [f"    {line}" for line in a["body"]]
+        out.append("")
+    return "\n".join(out)
 
 
-ROMAN_VALUE = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6}
-
-
-def describe(cfg, tomes):
-    """One description for the whole mod: every captured tome, lowest tier first."""
+def describe(cfg, tomes, units=()):
+    """Write the facts for the whole mod's description: every captured tome
+    (lowest tier first), then the units."""
     strings, _ = po.load_mod_strings(cfg["mod_folder"], cfg["language"])
     names = po.name_strings(strings)
     vocab = sorted(set(names) | po.terms(strings))
-    data = [describe_tome(cfg, t, strings, names, vocab) for t in tomes]
+    data = [tome_facts(cfg, t, strings, names, vocab) for t in tomes]
     data.sort(key=lambda t: ROMAN_VALUE.get(t["tier"] or "", 99))  # stable: ties keep project order
+    unit_data = [unit_facts(cfg, u, names, vocab) for u in units]
     mod = file_name(Path(cfg["mod_folder"]).name)
-    for style in ("structured", "compact"):
-        text = bbcode(data, style)
-        path = final_dir(cfg) / f"{mod} - Description ({style}).txt"
-        path.write_text(text, encoding="utf-8")
-        note = "  <- your default" if style == cfg.get("description_style", "structured") else ""
-        print(f"  {path}  ({len(text)} of Steam's 8000 characters){note}")
-    order = [t["name"] + (f" (Tier {t['tier']})" if t["tier"] else "") for t in data]
-    print(f"  Tomes in order: {', '.join(order)}")
-    if any(re.search(r"\bX\b", line) for t in data for _, d in t["entries"] for line in d):
-        print("  Note: 'X' marks numbers the game computes (not in the .po files) - fill them in.")
+    path = final_dir(cfg) / "_captures" / "description_facts.md"
+    path.write_text(facts_markdown(mod, data, unit_data), encoding="utf-8")
+    print(f"  {path}")
+    print(f"  Covers: {', '.join([t['name'] for t in data] + [u['name'] for u in unit_data])}")
+    print(f"  Next: the agent writes '{mod} - Description.txt' from these facts (see AGENTS.md).")
     if any(t["candidates"] for t in data):
         print("  Possible sub-tooltips (mod names linked inside tooltips; add to \"subtooltips\" to capture):")
         for t in data:

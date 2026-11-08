@@ -5,9 +5,12 @@ captured straight from the game's encyclopedia:
 
 - **`<Tome> - Overview.png`** – the tome page as shown in game, side panel blended away
 - **`<Tome> - Tooltips.png`** – every skill tooltip with your icon art beside it
-  (units are left out – they deserve their own images)
-- **`<Mod> - Description (structured).txt` / `(compact).txt`** – a BBCode draft
-  for the Workshop page, covering all the mod's tomes (lowest tier first)
+  (units are left out – they get their own)
+- **`<Unit>.png`** – each tome unit's page (racial units in the form you pick)
+  with its key ability tooltips alongside
+- **`<Mod> - Description.txt`** – a short BBCode description for the Workshop
+  page covering all the mod's tomes, written by the agent from the captured
+  tooltips and your .po files
 
 The tool drives the game itself: opens the encyclopedia from the main menu,
 searches each tome, reads the page to find the skills and hovers each one.

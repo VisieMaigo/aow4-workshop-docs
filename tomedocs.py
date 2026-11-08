@@ -2,14 +2,17 @@
 
   python tomedocs.py init "<mod folder>"         create a project from the mod's .po files
   python tomedocs.py check                       check the game window / screen setup (no input sent)
-  python tomedocs.py preview <project> [--tome T]   list what would be captured (opens the pages, hovers nothing)
-  python tomedocs.py capture <project> [--tome T] [--only "Skill A,Skill B"]
-  python tomedocs.py compose <project> [--tome T]
-  python tomedocs.py describe <project> [--tome T]
-  python tomedocs.py run <project> [--tome T]    capture + compose + describe
+  python tomedocs.py preview <project>           list what would be captured (opens the pages, hovers nothing)
+  python tomedocs.py capture <project> [--only "Skill A,Skill B"]
+  python tomedocs.py compose <project>
+  python tomedocs.py describe <project>
+  python tomedocs.py run <project>               capture + compose + describe
+
+All of them take --tome T / --unit U (partial names, repeatable) to limit the
+run; naming only tomes leaves units out and vice versa.
 
 Capture moves your mouse: start it with the game on the main menu and don't
-touch the mouse/keyboard until it's done (about 30 s per tome).
+touch the mouse/keyboard until it's done (about 30 s per tome or unit).
 """
 import argparse
 import sys
@@ -18,10 +21,11 @@ from tomedocs import config
 
 
 def cmd_init(args):
-    path, tomes = config.init(args.mod_folder, args.name, args.language)
+    path, tomes, units = config.init(args.mod_folder, args.name, args.language)
     print(f"Created {path}")
     print(f"Tomes found: {', '.join(tomes) or 'none - add them by hand'}")
-    print("Optional: edit it to set icon_folder, subtooltips, hide_in_tooltips_image per tome.")
+    print(f"Units found: {', '.join(units) or 'none - add them by hand'}")
+    print("Optional: edit it to set icon_folder and subtooltips per tome, and form (racial units) per unit.")
     print(f"Next: start the game, go to the main menu, then run:  python tomedocs.py run {path.stem}")
 
 
@@ -56,6 +60,7 @@ def main():
         p = sub.add_parser(name)
         p.add_argument("project")
         p.add_argument("--tome", action="append", help="only this tome (partial name; repeatable)")
+        p.add_argument("--unit", action="append", help="only this unit (partial name; repeatable)")
         if name in ("capture", "run"):
             p.add_argument("--only", help="comma-separated skill names to re-capture (others kept)")
     args = ap.parse_args()
@@ -65,28 +70,38 @@ def main():
     if args.cmd == "check":
         return cmd_check(args)
     cfg = config.load(args.project)
-    tomes = config.pick_tomes(cfg, args.tome)
+    tomes, units = config.pick(cfg, args.tome, args.unit)
     if args.cmd == "preview":
         from tomedocs.capture import capture
-        return capture(cfg, tomes, preview=True)
+        return capture(cfg, tomes, units, preview=True)
     if args.cmd in ("capture", "run"):
         from tomedocs.capture import capture
-        capture(cfg, tomes, [s.strip() for s in args.only.split(",")] if args.only else None)
-    captured = [t for t in tomes if (config.tome_dir(cfg, t) / "manifest.json").exists()]
-    for t in tomes:
-        if t not in captured:
-            print(f"[{t['name']}] not captured yet - skipped (run: capture {cfg['name']} --tome \"{t['name']}\")")
+        capture(cfg, tomes, units, [s.strip() for s in args.only.split(",")] if args.only else None)
+
+    def done(item, folder):
+        return (folder(cfg, item) / "manifest.json").exists()
+
+    for kind, items, folder in (("tome", tomes, config.tome_dir), ("unit", units, config.unit_dir)):
+        for x in items:
+            if not done(x, folder):
+                print(f"[{x['name']}] not captured yet - skipped (run: capture {cfg['name']} --{kind} \"{x['name']}\")")
     if args.cmd in ("compose", "run"):
-        from tomedocs.compose import compose
-        for t in captured:
-            print(f"[{t['name']}]")
-            compose(cfg, t)
+        from tomedocs.compose import compose, compose_unit
+        for t in tomes:
+            if done(t, config.tome_dir):
+                print(f"[{t['name']}]")
+                compose(cfg, t)
+        for u in units:
+            if done(u, config.unit_dir):
+                print(f"[{u['name']}]")
+                compose_unit(cfg, u)
     if args.cmd in ("describe", "run"):
-        # The description covers the whole mod, so it uses every captured tome.
-        everything = [t for t in cfg["tomes"] if (config.tome_dir(cfg, t) / "manifest.json").exists()]
-        if everything:
+        # The description covers the whole mod, so it uses everything captured.
+        all_tomes = [t for t in cfg["tomes"] if done(t, config.tome_dir)]
+        all_units = [u for u in cfg["units"] if done(u, config.unit_dir)]
+        if all_tomes or all_units:
             from tomedocs.describe import describe
-            describe(cfg, everything)
+            describe(cfg, all_tomes, all_units)
 
 
 if __name__ == "__main__":

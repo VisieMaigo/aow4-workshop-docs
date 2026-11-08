@@ -103,5 +103,13 @@ class Game:
             kb_ctl.release(ch)
             time.sleep(0.04)
 
+    def scroll(self, x, y, clicks):
+        """Mouse wheel at a point; negative = down."""
+        self.move(x, y)
+        for _ in range(abs(clicks)):
+            mouse_ctl.scroll(0, -1 if clicks < 0 else 1)
+            time.sleep(0.05)
+        time.sleep(0.4)
+
     def looks_black(self):
         return np.asarray(self.grab()).mean() < 3

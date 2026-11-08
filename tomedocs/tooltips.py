@@ -103,12 +103,21 @@ def _border_segments(img):
 
 def sub_tooltip(img, title):
     """Crop a sub-tooltip out of a capture that also caught bits of its parent
-    (the parent can shift when the nested tooltip opens): find the sub-tooltip's
-    all-caps title and take the bordered box around it."""
+    (the parent can shift when the nested tooltip opens)."""
+    box = titled_box(img, title)
+    return img.crop(box) if box else cut_at_bottom_border(img)
+
+
+def titled_box(img, title):
+    """Box (x0, y0, x1, y1) of the tooltip whose all-caps title contains
+    `title`: the bordered rectangle around that title line. None if not found.
+    Works where frame differences don't, e.g. over an animated unit model."""
     want = norm(title)
-    head = next((b for t, b in read_lines(img) if want in norm(t) and t.upper() == t), None)
+    heads = [(t, b) for t, b in read_lines(img) if want in norm(t) and t.upper() == t]
+    # An exact title beats a longer one containing it ("ARCFIRE" vs "ARCFIRE STRIKE").
+    head = next((b for t, b in heads if norm(t) == want), heads[0][1] if heads else None)
     if not head:
-        return cut_at_bottom_border(img)
+        return None
     horizontal, vertical = _border_segments(img)
     tx0, ty0, tx1, ty1 = head
     cy = (ty0 + ty1) / 2
@@ -122,7 +131,7 @@ def sub_tooltip(img, title):
     span = 0.05 * (R - L)
     bottom = [y0 for x0, y0, x1, y1 in horizontal if y0 > ty1 and x0 <= L + span and x1 >= R - span]
     B = max(bottom) + 2 if bottom else img.height
-    return img.crop((max(L, 0), max(T, 0), min(R, img.width), min(B, img.height)))
+    return max(L, 0), max(T, 0), min(R, img.width), min(B, img.height)
 
 
 def find_link(frame, box, link):

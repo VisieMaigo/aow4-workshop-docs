@@ -125,3 +125,41 @@ def _wrapped_line(lines, i, scale):
         if by0 > y1 and abs((bx0 + bx1) / 2 - cx) < 30 * scale:
             return text
     return None
+
+
+def unit_abilities(img, names, scale=1.0, lines=None):
+    """Abilities listed on a unit page's card (the panel on the right).
+
+    Returns [(name, (x, y), is_attack, is_mod)] in card order. Ability names sit
+    in one column under the stats; an ability with damage numbers to its right
+    is an attack; is_mod = the name is one of the mod's own (.po) names.
+    """
+    w = img.width
+    lines = sorted(lines if lines is not None else read_lines(img), key=lambda l: (l[1][1], l[1][0]))
+    card = [(t, b) for t, b in lines if b[0] > 0.74 * w]
+    tier = next((b for t, b in card if re.search(r"\bTier\b", t)), None)
+    if not tier:
+        return []
+    below = [(t, b) for t, b in card if b[1] > tier[3] + 60 * scale and re.search(r"[A-Za-z]{3}", t)]
+    if not below:
+        return []
+    # The ability column: the left edge most of these lines share.
+    lefts = sorted(b[0] for _, b in below)
+    column = max(lefts, key=lambda x: sum(abs(x - o) <= 12 * scale for o in lefts))
+    rows = []
+    for text, b in below:
+        if abs(b[0] - column) > 12 * scale:
+            continue
+        if rows and b[1] - rows[-1][1][3] < 12 * scale:  # wrapped name: "Status Effect Immunity:" / "Chilled"
+            t0, b0 = rows[-1]
+            rows[-1] = (f"{t0} {text}", (b0[0], b0[1], max(b0[2], b[2]), b[3]))
+        else:
+            rows.append((text, b))
+    found = []
+    for text, (x0, y0, x1, y1) in rows:
+        cy = (y0 + y1) / 2
+        attack = any(re.search(r"\d", t) and b[0] > x1 + 20 * scale and abs((b[1] + b[3]) / 2 - cy) < 12 * scale
+                     for t, b in card)
+        name = match_name(text, names)
+        found.append((name or text.strip(), ((x0 + x1) // 2, int(cy)), attack, bool(name)))
+    return found
