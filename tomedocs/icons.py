@@ -66,5 +66,8 @@ def match(entry, folder, icons):
     want = norm(entry["name"])
     hits = [f for f in icons if want in norm(Path(f).stem)]
     if hits:
-        return min(hits, key=len), "name"
+        # Several files can share the name (CombatEnchantment_X, SpecialProvinceImprovement_X):
+        # prefer the one whose prefix is the skill's type.
+        kind = norm(entry.get("type", ""))
+        return min(hits, key=lambda f: (not (kind and norm(Path(f).stem).startswith(kind)), len(f))), "name"
     return None, "no match"
