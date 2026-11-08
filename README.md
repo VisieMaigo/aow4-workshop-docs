@@ -15,6 +15,14 @@ captured straight from the game's encyclopedia:
 The tool drives the game itself: opens the encyclopedia from the main menu,
 searches each tome, reads the page to find the skills and hovers each one.
 
+## Example output
+
+From the *Tomes of Winter* mod:
+
+| Tome overview | Skill tooltips | Unit page |
+|---|---|---|
+| [![Tome overview](docs/example-overview.png)](docs/example-overview.png) | [![Skill tooltips](docs/example-tooltips.png)](docs/example-tooltips.png) | [![Unit page](docs/example-unit.png)](docs/example-unit.png) |
+
 ## How to use it
 
 Open an AI coding agent (Claude Code, Copilot, Codex, ...) in this folder and
@@ -35,3 +43,17 @@ Prefer doing it by hand? See the commands in [AGENTS.md](AGENTS.md).
 
 Finished files land in `output/<project>/` (working files in its `_captures`
 folder). The description is a draft - give it a read.
+
+## Nested tooltips
+
+Want a nested tooltip for a hyperlink referenced inside the main tooltip? Just ask:
+"also capture the *Arcfire* tooltip inside *Arcfire Strike*".
+
+## Notes
+
+- The encyclopedia UI is removed by blending the background back together,
+  and the blend isn't always perfect. If a unit page looks off, take the
+  captured page image from `output/<project>/_captures/`, reblend it yourself,
+  and set the unit's `base_image` in `projects/<name>.json` to your version -
+  the tool then uses it as is and only overlays the tooltips on top (rerun
+  `compose`, no game needed).

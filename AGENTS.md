@@ -123,7 +123,7 @@ Examples:
 | `output_size` | Image size, default `[1920, 1080]`; `null` = game resolution. |
 | `tomes[].icon_folder` | The mod's icon PNGs. Matched to skills by **picture** (vs. the in-game icon), or by name for text links. |
 | `tomes[].icons` | Manual picks: `{"Skill name": "file.png"}`. |
-| `tomes[].subtooltips` | Nested tooltips: `[{"parent": "Skill name", "link": "Link text inside its tooltip"}]`. Stacked under the parent. |
+| `tomes[].subtooltips` | Nested tooltips: `[{"parent": "Skill name", "link": "Link text inside its tooltip"}]` - `parent` is the skill whose tooltip contains the link, `link` the underlined text as shown. Stacked under the parent. When the user asks for "the X tooltip inside Y", add `{"parent": "Y", "link": "X"}` here (or under the unit, for unit abilities). |
 | `tomes[].hide_in_tooltips_image` | Extra skills to leave out of the Tooltips image (units are always left out). |
 | `tomes[].skip` | Names on the page not to hover. |
 | `tomes[].extra_hovers` | Base-game names on the page to capture too (only the mod's own names are hovered by default). |
