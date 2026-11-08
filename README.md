@@ -12,8 +12,11 @@ captured straight from the game's encyclopedia:
   page covering all the mod's tomes, written by the agent from the captured
   tooltips and your .po files
 
-The tool drives the game itself: opens the encyclopedia from the main menu,
-searches each tome, reads the page to find the skills and hovers each one.
+Python drives the game and does the capturing, cropping and compositing: it
+opens the encyclopedia from the main menu, searches each tome, reads the page
+to find the skills and hovers each one. An LLM agent turns your requests into
+settings, runs the tool, reviews the resulting images and fixes what looks
+off, and writes the Workshop description.
 
 ## Example output
 
